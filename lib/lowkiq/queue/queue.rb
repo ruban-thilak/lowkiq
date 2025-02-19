@@ -14,7 +14,7 @@ module Lowkiq
 
       def push(batch)
         @pool.with do |redis|
-          redis.multi do
+          redis.multi do |redis_pipeline|
             batch.each do |job|
               id          = job.fetch(:id)
               perform_in  = job.fetch(:perform_in, @timestamp.call)
@@ -24,12 +24,12 @@ module Lowkiq
 
               shard = id_to_shard id
 
-              redis.zadd @keys.all_ids_lex_zset, 0, id
-              redis.zadd @keys.all_ids_scored_by_perform_in_zset, perform_in, id, nx: true
-              redis.zadd @keys.all_ids_scored_by_retry_count_zset, retry_count, id, nx: true
+              redis_pipeline.zadd @keys.all_ids_lex_zset, 0, id
+              redis_pipeline.zadd @keys.all_ids_scored_by_perform_in_zset, perform_in, id, nx: true
+              redis_pipeline.zadd @keys.all_ids_scored_by_retry_count_zset, retry_count, id, nx: true
 
-              redis.zadd @keys.ids_scored_by_perform_in_zset(shard), perform_in, id, nx: true
-              redis.zadd @keys.payloads_zset(id), score, Lowkiq.dump_payload.call(payload), nx: true
+              redis_pipeline.zadd @keys.ids_scored_by_perform_in_zset(shard), perform_in, id, nx: true
+              redis_pipeline.zadd @keys.payloads_zset(id), score, Lowkiq.dump_payload.call(payload), nx: true
             end
           end
         end
@@ -42,24 +42,24 @@ module Lowkiq
                                     limit: [0, limit]
           return [] if ids.empty?
 
-          res = redis.multi do |redis|
-            redis.hset @keys.processing_length_by_shard_hash, shard, ids.length
+          res = redis.multi do |redis_pipeline|
+            redis_pipeline.hset @keys.processing_length_by_shard_hash, shard, ids.length
 
             ids.each do |id|
-              redis.zrem @keys.all_ids_lex_zset, id
-              redis.zrem @keys.ids_scored_by_perform_in_zset(shard), id
+              redis_pipeline.zrem @keys.all_ids_lex_zset, id
+              redis_pipeline.zrem @keys.ids_scored_by_perform_in_zset(shard), id
 
-              Script.zremhset redis,
+              Script.zremhset redis_pipeline,
                               @keys.all_ids_scored_by_perform_in_zset,
                               @keys.processing_ids_with_perform_in_hash(shard),
                               id
-              Script.zremhset redis,
+              Script.zremhset redis_pipeline,
                               @keys.all_ids_scored_by_retry_count_zset,
                               @keys.processing_ids_with_retry_count_hash(shard),
                               id
-              redis.rename @keys.payloads_zset(id),
+              redis_pipeline.rename @keys.payloads_zset(id),
                            @keys.processing_payloads_zset(id)
-              Script.hmove redis,
+              Script.hmove redis_pipeline,
                            @keys.errors_hash,
                            @keys.processing_errors_hash(shard),
                            id
@@ -75,7 +75,7 @@ module Lowkiq
       def push_back(batch)
         @pool.with do |redis|
           timestamp = @timestamp.call
-          redis.multi do |redis|
+          redis.multi do |redis_pipeline|
             batch.each do |job|
               id          = job.fetch(:id)
               perform_in  = job.fetch(:perform_in, timestamp)
@@ -87,14 +87,14 @@ module Lowkiq
 
               shard = id_to_shard id
 
-              redis.zadd @keys.all_ids_lex_zset, 0, id
-              redis.zadd @keys.all_ids_scored_by_perform_in_zset, perform_in, id
-              redis.zadd @keys.all_ids_scored_by_retry_count_zset, retry_count, id
+              redis_pipeline.zadd @keys.all_ids_lex_zset, 0, id
+              redis_pipeline.zadd @keys.all_ids_scored_by_perform_in_zset, perform_in, id
+              redis_pipeline.zadd @keys.all_ids_scored_by_retry_count_zset, retry_count, id
 
-              redis.zadd @keys.ids_scored_by_perform_in_zset(shard), perform_in, id
-              redis.zadd @keys.payloads_zset(id), payloads, nx: true
+              redis_pipeline.zadd @keys.ids_scored_by_perform_in_zset(shard), perform_in, id
+              redis_pipeline.zadd @keys.payloads_zset(id), payloads, nx: true
 
-              redis.hset @keys.errors_hash, id, error unless error.nil?
+              redis_pipeline.hset @keys.errors_hash, id, error unless error.nil?
             end
           end
         end
@@ -105,16 +105,16 @@ module Lowkiq
         length = ids.length
 
         @pool.with do |redis|
-          redis.multi do
-            redis.del @keys.processing_ids_with_perform_in_hash(shard)
-            redis.del @keys.processing_ids_with_retry_count_hash(shard)
-            redis.del @keys.processing_errors_hash(shard)
+          redis.multi do |redis_pipeline|
+            redis_pipeline.del @keys.processing_ids_with_perform_in_hash(shard)
+            redis_pipeline.del @keys.processing_ids_with_retry_count_hash(shard)
+            redis_pipeline.del @keys.processing_errors_hash(shard)
             ids.each do |id|
-              redis.del @keys.processing_payloads_zset(id)
+              redis_pipeline.del @keys.processing_payloads_zset(id)
             end
-            redis.hdel @keys.processing_length_by_shard_hash, shard
-            redis.incrby @keys.processed_key, length if result == :success
-            redis.incrby @keys.failed_key,    length if result == :fail
+            redis_pipeline.hdel @keys.processing_length_by_shard_hash, shard
+            redis_pipeline.incrby @keys.processed_key, length if result == :success
+            redis_pipeline.incrby @keys.failed_key,    length if result == :fail
           end
         end
       end
@@ -124,8 +124,8 @@ module Lowkiq
           ids = redis.hkeys @keys.processing_ids_with_perform_in_hash(shard)
           return [] if ids.empty?
 
-          res = redis.multi do |redis|
-            processing_data_pipeline redis, shard, ids
+          res = redis.multi do |redis_pipeline|
+            processing_data_pipeline redis_pipeline, shard, ids
           end
 
           processing_data_build res, ids
@@ -135,7 +135,7 @@ module Lowkiq
       def push_to_morgue(batch)
         @pool.with do |redis|
           timestamp = @timestamp.call
-          redis.multi do
+          redis.multi do |redis_pipeline|
             batch.each do |job|
               id       = job.fetch(:id)
               payloads = job.fetch(:payloads).map do |(payload, score)|
@@ -144,11 +144,11 @@ module Lowkiq
               error    = Lowkiq.dump_error.call(job.fetch(:error, nil))
 
 
-              redis.zadd @keys.morgue_all_ids_lex_zset, 0, id
-              redis.zadd @keys.morgue_all_ids_scored_by_updated_at_zset, timestamp, id
-              redis.zadd @keys.morgue_payloads_zset(id), payloads, nx: true
+              redis_pipeline.zadd @keys.morgue_all_ids_lex_zset, 0, id
+              redis_pipeline.zadd @keys.morgue_all_ids_scored_by_updated_at_zset, timestamp, id
+              redis_pipeline.zadd @keys.morgue_payloads_zset(id), payloads, nx: true
 
-              redis.hset @keys.morgue_errors_hash, id, error unless error.nil?
+              redis_pipeline.hset @keys.morgue_errors_hash, id, error unless error.nil?
             end
           end
         end
@@ -156,12 +156,12 @@ module Lowkiq
 
       def morgue_delete(ids)
         @pool.with do |redis|
-          redis.multi do
+          redis.multi do |redis_pipeline|
             ids.each do |id|
-              redis.zrem @keys.morgue_all_ids_lex_zset, id
-              redis.zrem @keys.morgue_all_ids_scored_by_updated_at_zset, id
-              redis.del  @keys.morgue_payloads_zset(id)
-              redis.hdel @keys.morgue_errors_hash, id
+              redis_pipeline.zrem @keys.morgue_all_ids_lex_zset, id
+              redis_pipeline.zrem @keys.morgue_all_ids_scored_by_updated_at_zset, id
+              redis_pipeline.del  @keys.morgue_payloads_zset(id)
+              redis_pipeline.hdel @keys.morgue_errors_hash, id
             end
           end
         end
@@ -169,15 +169,15 @@ module Lowkiq
 
       def delete(ids)
         @pool.with do |redis|
-          redis.multi do
+          redis.multi do |redis_pipeline|
             ids.each do |id|
               shard = id_to_shard id
-              redis.zrem @keys.all_ids_lex_zset, id
-              redis.zrem @keys.all_ids_scored_by_perform_in_zset, id
-              redis.zrem @keys.all_ids_scored_by_retry_count_zset, id
-              redis.zrem @keys.ids_scored_by_perform_in_zset(shard), id
-              redis.del  @keys.payloads_zset(id)
-              redis.hdel @keys.errors_hash, id
+              redis_pipeline.zrem @keys.all_ids_lex_zset, id
+              redis_pipeline.zrem @keys.all_ids_scored_by_perform_in_zset, id
+              redis_pipeline.zrem @keys.all_ids_scored_by_retry_count_zset, id
+              redis_pipeline.zrem @keys.ids_scored_by_perform_in_zset(shard), id
+              redis_pipeline.del  @keys.payloads_zset(id)
+              redis_pipeline.hdel @keys.errors_hash, id
             end
           end
         end

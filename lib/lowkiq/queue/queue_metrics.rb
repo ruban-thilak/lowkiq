@@ -8,9 +8,8 @@ module Lowkiq
 
       def call(queues)
         result = @redis_pool.with do |redis|
-          #redis.pipelined do
-          redis.multi do
-            queues.each { |queue| pipeline redis, queue }
+          redis.multi do |redis_pipeline|
+            queues.each { |queue| pipeline(redis_pipeline, queue) }
           end
         end
 
