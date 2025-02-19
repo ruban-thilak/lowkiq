@@ -5,12 +5,12 @@ require "lowkiq/version"
 Gem::Specification.new do |spec|
   spec.name          = "lowkiq"
   spec.version       = Lowkiq::VERSION
-  spec.authors       = ["Mikhail Kuzmin"]
-  spec.email         = ["m.kuzmin@darkleaf.ru"]
+  spec.authors       = ["Ruban Thilak"]
+  spec.email         = ["ruban.thilak@freshworks.com"]
 
   spec.summary       = %q{Lowkiq}
   spec.description   = %q{Lowkiq}
-  spec.homepage      = "https://github.com/bia-technologies/lowkiq"
+  spec.homepage      = "https://github.com/freshworksinc/lowkiq"
   spec.licenses      = ['LGPL', 'EULA']
 
   # Specify which files should be added to the gem when it is released.
@@ -25,8 +25,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "redis", ">= 4.0.1", "<= 5.0"
-  spec.add_dependency "connection_pool", "~> 2.2", ">= 2.2.2"
-  spec.add_dependency "rack", ">= 1.5.0"
+  spec.add_dependency "connection_pool", ">= 2.4.0"
+  spec.add_dependency "rack", ">= 3.1.0"
+  spec.add_dependency "logger"
 
   spec.add_development_dependency "bundler", "~> 2.1"
   spec.add_development_dependency "rake", "~> 12.3.0"
