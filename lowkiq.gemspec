@@ -21,8 +21,7 @@ Gem::Specification.new do |spec|
       .reject { |f| f.match(%r{^(spec|frontend|examples|doc)/}) }
       .push('assets/app.js')
   end
-  spec.bindir        = "exe"
-  spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
+  spec.executables   = ["lowkiq"]
   spec.require_paths = ["lib"]
 
   spec.add_dependency "redis", ">= 4.0.1", "<= 5.0"

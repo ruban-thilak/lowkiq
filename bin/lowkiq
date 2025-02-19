@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+
+require 'lowkiq/cli'
+require 'lowkiq'
+
+begin
+  cli = Lowkiq::CLI.instance
+  cli.parse
+  cli.run
+rescue => ex
+  warn e.message
+  warn e.backtrace.join("\n")
+  exit 1
+end
