@@ -21,7 +21,7 @@ module Lowkiq
     def launch
       self_read, self_write = IO.pipe
 
-      puts "Booting Lowkiq Server..."
+      puts "Booting Lowkiq Server [#{Lowkiq::VERSION}]"
       @server = Lowkiq::Server.build(@options)
 
       begin
