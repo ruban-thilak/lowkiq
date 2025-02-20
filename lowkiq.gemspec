@@ -26,7 +26,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "redis", ">= 4.0.1", "<= 5.0"
   spec.add_dependency "connection_pool", ">= 2.4.0"
-  spec.add_dependency "rack", ">= 3.1.0"
+  spec.add_dependency "rack", ">= 2.2.4"
   spec.add_dependency "logger"
 
   spec.add_development_dependency "bundler", "~> 2.1"

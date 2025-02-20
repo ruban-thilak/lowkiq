@@ -6,12 +6,12 @@ module Lowkiq
       end
 
       def fetch(redis, strategy, ids)
-        resp = redis.public_send strategy do
+        resp = redis.public_send(strategy) do |redis_pipeline|
           ids.each do |id|
-            redis.zscore @keys.all_ids_scored_by_perform_in_zset, id
-            redis.zscore @keys.all_ids_scored_by_retry_count_zset, id
-            redis.zrange @keys.payloads_zset(id), 0, -1, with_scores: true
-            redis.hget   @keys.errors_hash, id
+            redis_pipeline.zscore @keys.all_ids_scored_by_perform_in_zset, id
+            redis_pipeline.zscore @keys.all_ids_scored_by_retry_count_zset, id
+            redis_pipeline.zrange @keys.payloads_zset(id), 0, -1, with_scores: true
+            redis_pipeline.hget   @keys.errors_hash, id
           end
         end
 

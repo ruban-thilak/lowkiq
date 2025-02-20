@@ -11,8 +11,8 @@ module Lowkiq
 
       def perform_all_jobs_now
         @pool.with do |redis|
-          uredis = Utils::Redis.new redis
           redis.multi do |redis_pipeline|
+            uredis = Utils::Redis.new redis_pipeline
             uredis.zresetscores @keys.all_ids_scored_by_perform_in_zset
             @queue.shards.each do |shard|
               uredis.zresetscores @keys.ids_scored_by_perform_in_zset(shard)
