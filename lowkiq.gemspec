@@ -24,7 +24,7 @@ Gem::Specification.new do |spec|
   spec.executables   = ["lowkiq"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "redis", ">= 4.0.1", "<= 5.0"
+  spec.add_dependency "redis", ">= 4.0.1", "<= 5.4"
   spec.add_dependency "connection_pool", ">= 2.4.0"
   spec.add_dependency "rack", ">= 2.2.4"
   spec.add_dependency "logger"
